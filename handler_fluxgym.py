@@ -10,35 +10,76 @@ import json
 import subprocess
 import sys
 import uuid
-from huggingface_hub import snapshot_download
+from huggingface_hub import hf_hub_download
 import boto3
 from botocore.config import Config
 
 def download_flux_model():
-    """Download FLUX.1-dev model if not already cached"""
-    model_path = "/workspace/models/FLUX.1-dev"
+    """Download FLUX.1-dev model and all required text encoders"""
+    print("Setting up FLUX models and text encoders...")
     
-    if not os.path.exists(model_path):
+    # Get HuggingFace token from environment
+    hf_token = os.getenv('HUGGINGFACE_TOKEN')
+    if not hf_token:
+        print("Warning: HUGGINGFACE_TOKEN not found. FLUX.1-dev requires a token.")
+    
+    # Create model directories
+    os.makedirs("/workspace/models/unet", exist_ok=True)
+    os.makedirs("/workspace/models/clip", exist_ok=True) 
+    os.makedirs("/workspace/models/vae", exist_ok=True)
+    
+    # 1. Download FLUX.1-dev main model (23.8GB)
+    flux_model_path = "/workspace/models/unet/flux1-dev.sft"
+    if not os.path.exists(flux_model_path):
         print("Downloading FLUX.1-dev model (23.8GB)...")
-        os.makedirs("/workspace/models", exist_ok=True)
-        
-        # Get HuggingFace token from environment
-        hf_token = os.getenv('HUGGINGFACE_TOKEN')
-        if not hf_token:
-            print("Warning: HUGGINGFACE_TOKEN not found. FLUX.1-dev requires a token.")
-        
-        # Download with HuggingFace Hub
-        snapshot_download(
+        from huggingface_hub import hf_hub_download
+        hf_hub_download(
             repo_id="black-forest-labs/FLUX.1-dev",
-            local_dir=model_path,
+            filename="flux1-dev.sft",
+            local_dir="/workspace/models/unet",
             local_dir_use_symlinks=False,
             token=hf_token
         )
         print("FLUX.1-dev model download completed!")
-    else:
-        print("FLUX.1-dev model already cached")
     
-    return model_path
+    # 2. Download CLIP text encoder
+    clip_path = "/workspace/models/clip/clip_l.safetensors"
+    if not os.path.exists(clip_path):
+        print("Downloading CLIP text encoder...")
+        hf_hub_download(
+            repo_id="comfyanonymous/flux_text_encoders",
+            filename="clip_l.safetensors",
+            local_dir="/workspace/models/clip",
+            local_dir_use_symlinks=False
+        )
+        print("CLIP text encoder download completed!")
+    
+    # 3. Download T5XXL text encoder (large!)
+    t5xxl_path = "/workspace/models/clip/t5xxl_fp16.safetensors"
+    if not os.path.exists(t5xxl_path):
+        print("Downloading T5XXL text encoder...")
+        hf_hub_download(
+            repo_id="comfyanonymous/flux_text_encoders", 
+            filename="t5xxl_fp16.safetensors",
+            local_dir="/workspace/models/clip",
+            local_dir_use_symlinks=False
+        )
+        print("T5XXL text encoder download completed!")
+    
+    # 4. Download VAE (AutoEncoder)
+    vae_path = "/workspace/models/vae/ae.sft"
+    if not os.path.exists(vae_path):
+        print("Downloading VAE...")
+        hf_hub_download(
+            repo_id="cocktailpeanut/xulf-dev",
+            filename="ae.sft", 
+            local_dir="/workspace/models/vae",
+            local_dir_use_symlinks=False
+        )
+        print("VAE download completed!")
+    
+    print("All FLUX models and text encoders ready!")
+    return "/workspace/models/unet/flux1-dev.sft"
 
 def upload_to_r2(file_path, object_name):
     """Upload file to Cloudflare R2 storage"""
@@ -115,25 +156,57 @@ def run_flux_training(job):
             with open(f"{train_dir}/image_{i:03d}.txt", "w") as f:
                 f.write(f"{trigger_word} {character_name}")
         
-        # Run Kohya training script with accelerate
+        # Create dataset.toml file (FluxGym style)
+        dataset_config = f"""[[datasets]]
+[[datasets.subsets]]
+image_dir = "{train_dir}"
+num_repeats = 10
+class_tokens = "{trigger_word} {character_name}"
+
+[datasets.subsets.image_preprocessing]
+resolution = 1024
+random_crop = false
+"""
+        
+        with open(f"{train_dir}/dataset.toml", "w") as f:
+            f.write(dataset_config)
+        
+        # Run Kohya training script with accelerate and all required text encoders
         kohya_cmd = [
             "accelerate", "launch",
-            "--num_processes=1",
-            "--gpu_ids=all",
+            "--mixed_precision", "bf16",
+            "--num_cpu_threads_per_process", "1",
             "/workspace/fluxgym/sd-scripts/flux_train_network.py",
             "--pretrained_model_name_or_path", model_path,
-            "--train_data_dir", train_dir,
-            "--output_dir", f"{train_dir}/output",
-            "--max_train_steps", str(steps),
-            "--save_every_n_steps", str(steps),
+            "--clip_l", "/workspace/models/clip/clip_l.safetensors",
+            "--t5xxl", "/workspace/models/clip/t5xxl_fp16.safetensors", 
+            "--ae", "/workspace/models/vae/ae.sft",
+            "--cache_latents_to_disk",
+            "--save_model_as", "safetensors",
+            "--sdpa", "--persistent_data_loader_workers",
+            "--max_data_loader_n_workers", "2",
+            "--seed", "42",
+            "--gradient_checkpointing",
             "--mixed_precision", "bf16",
-            "--optimizer_type", "adamw8bit",
-            "--learning_rate", "1e-4",
-            "--resolution", "1024",
-            "--train_batch_size", "1",
-            "--network_module", "networks.lora",
+            "--save_precision", "bf16",
+            "--network_module", "networks.lora_flux",
             "--network_dim", "32",
-            "--network_alpha", "16"
+            "--learning_rate", "8e-4",
+            "--cache_text_encoder_outputs",
+            "--cache_text_encoder_outputs_to_disk",
+            "--fp8_base",
+            "--highvram",
+            "--max_train_epochs", "16",
+            "--save_every_n_epochs", "4",
+            "--dataset_config", f"{train_dir}/dataset.toml",
+            "--output_dir", f"{train_dir}/output",
+            "--output_name", character_name,
+            "--timestep_sampling", "shift", 
+            "--discrete_flow_shift", "3.1582",
+            "--model_prediction_type", "raw",
+            "--guidance_scale", "1.0",
+            "--loss_type", "l2",
+            "--optimizer_type", "adamw8bit"
         ]
         
         result = subprocess.run(kohya_cmd, capture_output=True, text=True)
