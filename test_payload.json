@@ -1,0 +1,13 @@
+{
+  "input": {
+    "character_name": "test_hero",
+    "trigger_word": "hero",
+    "images": [
+      "https://example.com/character1.jpg",
+      "https://example.com/character2.jpg",
+      "https://example.com/character3.jpg"
+    ],
+    "steps": 1000,
+    "learning_rate": "1e-4"
+  }
+}
