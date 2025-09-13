@@ -1,29 +1,24 @@
-# Simple, clean FLUX training image  
-FROM runpod/pytorch:0.7.0-cu1241-torch241-ubuntu2204
+# SIMPLE WORKING FLUX CONTAINER
+FROM runpod/pytorch:2.4.0-py3.10-cuda12.1.1-devel-ubuntu22.04
 
 WORKDIR /workspace
 
-# Install system deps
-RUN apt-get update && apt-get install -y git wget build-essential && rm -rf /var/lib/apt/lists/*
+# Install runpod - THAT'S IT
+RUN pip install runpod
 
-# Copy requirements first for better Docker layer caching
-COPY requirements.txt requirements.txt
+# Copy handler
+COPY handler_fluxgym.py handler_fluxgym.py
 
-# Install requirements first (includes runpod)
-RUN pip install --no-cache-dir -r requirements.txt
+# Install basic requirements
+RUN pip install transformers diffusers accelerate safetensors huggingface-hub boto3
 
-# Install correct PyTorch for CUDA 12.4 first (before other packages)
-RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 --force-reinstall
-
-# Clone FluxGym and Kohya (sd3 branch is critical!)
+# Clone FluxGym
 RUN git clone https://github.com/cocktailpeanut/fluxgym.git
-RUN cd fluxgym && git clone -b sd3 https://github.com/kohya-ss/sd-scripts
 
-# Install Kohya requirements (may override some packages, but that's OK)
-RUN cd fluxgym/sd-scripts && pip install -r requirements.txt
+# Set environment
+ENV PYTHONPATH="/workspace/fluxgym"
 
-# Ensure runpod is still installed (in case Kohya overwrote it)
-RUN pip install --force-reinstall runpod>=1.6.2
+CMD ["python", "handler_fluxgym.py"]
 
 # Copy handler
 COPY handler_fluxgym.py handler_fluxgym.py
