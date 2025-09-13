@@ -106,7 +106,7 @@ def download_flux_model():
         print("VAE download completed!")
     
     print("All FLUX models and text encoders ready!")
-    return "/workspace/models/unet/flux1-dev.sft"
+    return "/app/models/unet/flux1-dev.sft"
 
 def upload_to_r2(file_path, object_name):
     """Upload file to Cloudflare R2 storage"""
@@ -203,11 +203,11 @@ random_crop = false
             "accelerate", "launch",
             "--mixed_precision", "bf16",
             "--num_cpu_threads_per_process", "1",
-            "/workspace/fluxgym/sd-scripts/flux_train_network.py",
+            "/app/sd-scripts/flux_train_network.py",
             "--pretrained_model_name_or_path", model_path,
-            "--clip_l", "/workspace/models/clip/clip_l.safetensors",
-            "--t5xxl", "/workspace/models/clip/t5xxl_fp16.safetensors", 
-            "--ae", "/workspace/models/vae/ae.sft",
+            "--clip_l", "/app/models/clip/clip_l.safetensors",
+            "--t5xxl", "/app/models/clip/t5xxl_fp16.safetensors", 
+            "--ae", "/app/models/vae/ae.sft",
             "--cache_latents_to_disk",
             "--save_model_as", "safetensors",
             "--sdpa", "--persistent_data_loader_workers",
