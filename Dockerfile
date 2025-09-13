@@ -1,5 +1,5 @@
 # Simple, clean FLUX training image  
-FROM runpod/pytorch:2.4.0-py3.10-cuda12.1.1-devel-ubuntu22.04
+FROM runpod/pytorch:0.7.0-cu1241-torch241-ubuntu2204
 
 WORKDIR /workspace
 
