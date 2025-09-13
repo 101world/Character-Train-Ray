@@ -4,6 +4,13 @@ Input: images + trigger_word + character_name
 Output: trained FLUX LoRA
 """
 
+# FIRST: Ensure all dependencies are installed
+try:
+    from ensure_deps import ensure_runtime_deps
+    ensure_runtime_deps()
+except ImportError:
+    print("⚠️  Dependency checker not found, continuing...")
+
 import runpod
 import os
 import json
