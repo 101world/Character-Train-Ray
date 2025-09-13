@@ -14,9 +14,20 @@ from huggingface_hub import hf_hub_download
 import boto3
 from botocore.config import Config
 
+# CRITICAL FluxGym environment configuration - THESE WERE MISSING!
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"  # Essential for HuggingFace transfers
+os.environ['GRADIO_ANALYTICS_ENABLED'] = '0'   # Disable Gradio analytics
+
 # Add FluxGym and Kohya to Python path
+sys.path.insert(0, '/workspace/fluxgym')
+sys.path.insert(0, '/workspace/fluxgym/sd-scripts')
 sys.path.append('/workspace/fluxgym')
 sys.path.append('/workspace/fluxgym/sd-scripts')
+
+# Set essential environment variables for training
+os.environ['PYTHONPATH'] = '/workspace/fluxgym/sd-scripts'
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+os.environ['LOG_LEVEL'] = 'DEBUG'
 
 # Set critical environment variables
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
@@ -265,8 +276,25 @@ random_crop = false
         return {"error": f"Exception: {str(e)}"}
 
 def handler(job):
-    """RunPod serverless handler"""
+    """RunPod serverless handler with proper validation"""
+    print(f"Handler called with job: {job}")
+    
+    # Validate RunPod serverless environment
+    if not job or 'input' not in job:
+        return {"error": "Invalid job format - missing input data"}
+    
+    if not job.get('id'):
+        return {"error": "Invalid job format - missing job ID"}
+    
+    # Log environment info for debugging
+    print(f"RUNPOD_JOB_ID: {job.get('id')}")
+    print(f"Python path: {sys.path}")
+    print(f"HF_HUB_ENABLE_HF_TRANSFER: {os.getenv('HF_HUB_ENABLE_HF_TRANSFER')}")
+    
     return run_flux_training(job)
 
 if __name__ == "__main__":
+    # This is the crucial RunPod serverless startup
+    print("Starting RunPod serverless worker...")
+    print("FluxGym FLUX character training endpoint ready")
     runpod.serverless.start({"handler": handler})
