@@ -21,8 +21,8 @@ RUN pip install transformers diffusers accelerate safetensors datasets torch tor
     timm Pillow requests tokenizers huggingface-hub boto3 slugify toml peft \
     bitsandbytes gradio
 
-# Install correct PyTorch for CUDA 12.4
-RUN pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 --force-reinstall
+# Install correct PyTorch for CUDA 12.4 (Python 3.13 compatible)
+RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 --force-reinstall
 
 # Copy handler
 COPY handler_fluxgym.py handler_fluxgym.py
