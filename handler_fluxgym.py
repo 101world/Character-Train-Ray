@@ -22,11 +22,17 @@ def download_flux_model():
         print("Downloading FLUX.1-dev model (23.8GB)...")
         os.makedirs("/workspace/models", exist_ok=True)
         
+        # Get HuggingFace token from environment
+        hf_token = os.getenv('HUGGINGFACE_TOKEN')
+        if not hf_token:
+            print("Warning: HUGGINGFACE_TOKEN not found. FLUX.1-dev requires a token.")
+        
         # Download with HuggingFace Hub
         snapshot_download(
             repo_id="black-forest-labs/FLUX.1-dev",
             local_dir=model_path,
-            local_dir_use_symlinks=False
+            local_dir_use_symlinks=False,
+            token=hf_token
         )
         print("FLUX.1-dev model download completed!")
     else:
