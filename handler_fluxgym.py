@@ -14,6 +14,15 @@ from huggingface_hub import hf_hub_download
 import boto3
 from botocore.config import Config
 
+# Add FluxGym and Kohya to Python path
+sys.path.append('/workspace/fluxgym')
+sys.path.append('/workspace/fluxgym/sd-scripts')
+
+# Set critical environment variables
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+os.environ["PYTHONIOENCODING"] = "utf-8"
+os.environ["LOG_LEVEL"] = "DEBUG"
+
 def download_flux_model():
     """Download FLUX.1-dev model and all required text encoders"""
     print("Setting up FLUX models and text encoders...")
@@ -28,10 +37,10 @@ def download_flux_model():
     os.makedirs("/workspace/models/clip", exist_ok=True) 
     os.makedirs("/workspace/models/vae", exist_ok=True)
     
-    # 1. Download FLUX.1-dev main model (23.8GB)
+    # 1. Download FLUX.1-dev main model (specific file, not full repo)
     flux_model_path = "/workspace/models/unet/flux1-dev.sft"
     if not os.path.exists(flux_model_path):
-        print("Downloading FLUX.1-dev model (23.8GB)...")
+        print("Downloading FLUX.1-dev model (flux1-dev.sft)...")
         from huggingface_hub import hf_hub_download
         hf_hub_download(
             repo_id="black-forest-labs/FLUX.1-dev",
@@ -208,6 +217,13 @@ random_crop = false
             "--loss_type", "l2",
             "--optimizer_type", "adamw8bit"
         ]
+        
+        # Set environment for training
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['LOG_LEVEL'] = 'DEBUG'
+        
+        result = subprocess.run(kohya_cmd, capture_output=True, text=True, env=env)
         
         result = subprocess.run(kohya_cmd, capture_output=True, text=True)
         

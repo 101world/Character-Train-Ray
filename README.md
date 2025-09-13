@@ -1,31 +1,52 @@
-# FluxGym RunPod Serverless Endpoint
+# Character-Train: FluxGym RunPod Serverless Endpoint
 
-**A clean, production-ready FLUX LoRA training endpoint for RunPod serverless deployment.**
+A complete RunPod serverless endpoint for FLUX LoRA character training using FluxGym integration with Cloudflare R2 storage.
 
-## 🎯 What This Does
+## Overview
 
-Train custom FLUX LoRA models for character training using a simple serverless API:
-- **Input**: Images + trigger word + character name
-- **Output**: Trained FLUX LoRA model (.safetensors)
-- **Automatic**: FLUX.1-dev model download (23.8GB) and caching
+This project creates a production-ready RunPod serverless worker that:
+- Accepts character images via Cloudflare R2 storage
+- Automatically downloads FLUX.1-dev model and text encoders
+- Trains custom LoRA using Kohya's sd-scripts (sd3 branch)
+- Returns trained model URLs back to R2 storage
+- Handles the complete end-to-end workflow seamlessly
 
-## 🚀 Quick Deploy
+## Architecture
 
-### RunPod Deployment
-1. **Build the container** using the `Dockerfile`
-2. **Deploy** with your RunPod API key
-3. **Send training requests** via the API
+```
+Character Images → R2 Upload → RunPod Worker → FLUX Training → Trained LoRA → R2 Download URLs
+```
 
-### API Usage
-```json
-{
-  "input": {
-    "images": ["https://example.com/image1.jpg", "https://example.com/image2.jpg"],
-    "trigger_word": "person",
-    "character_name": "character_name", 
-    "steps": 1000
-  }
-}
+### Core Components
+
+- **RunPod Serverless**: PyTorch 2.4.1 + CUDA 12.4.1 container
+- **FluxGym Integration**: Complete Kohya sd-scripts setup
+- **FLUX.1-dev Model**: Automatic download with HuggingFace authentication
+- **Text Encoders**: CLIP-L and T5-XXL for optimal training quality
+- **Cloudflare R2**: Secure storage for inputs and outputs
+- **Docker Container**: Production-ready with all dependencies
+
+## Quick Start
+
+### 1. Environment Setup
+
+Required environment variables in your RunPod endpoint:
+
+```bash
+# Cloudflare R2 Configuration
+CF_ACCESS_KEY_ID=your_r2_access_key
+CF_SECRET_ACCESS_KEY=your_r2_secret_key
+CF_R2_ENDPOINT_URL=https://your_account_id.r2.cloudflarestorage.com
+CF_R2_BUCKET_NAME=your_bucket_name
+
+# HuggingFace Authentication
+HUGGINGFACE_TOKEN=your_hf_token
+
+# Training Configuration
+FLUX_MODEL_PATH=/workspace/models/flux/flux1-dev.safetensors
+CLIP_MODEL_PATH=/workspace/models/clip/clip_l.safetensors
+T5_MODEL_PATH=/workspace/models/clip/t5xxl_fp16.safetensors
+VAE_MODEL_PATH=/workspace/models/vae/ae.sft
 ```
 
 ## 📁 Project Structure
